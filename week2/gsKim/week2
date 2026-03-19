@@ -13,6 +13,7 @@ Repository에서 패키지를 검색하고 설치할 수 있음.
 의존성 패키지를 자동으로 함께 설치함.
 즉, DNF는 내부적으로 RPM을 사용하지만, 사용자는 이를 통해 더 간단한 명령으로 패키지를 관리할 수 있게 해줌.
 
+
 ## 한줄 정리
 ### RPM: 개별 부품을 직접 조립하는 공구
 ### DNF: 필요한 부품까지 자동으로 챙겨서 설치해주는 관리자
@@ -112,8 +113,70 @@ Root 사용자: UID(사용자 식별 번호)가 0이며, 모든 파일과 명령
 /etc/shadow(용도: 암호화된 비밀번호):	비밀번호 해시, 만료일 등 보안 정보
 /etc/group(용도: 그룹 정보):	그룹명, GID, 그룹에 속한 사용자 목록
 
+##파일 권한 & 소유권 권한
+리눅스에서 파일 권한과 소유권 관리는 누가 파일을 읽고, 쓰고, 실행할 수 있는지를 정하는 작업이다. 서버를 운영할 때 보안과 접근 제어의 기본이 되는 개념이 된다. 
 
+#파일 권한
+파일 권한: 파일이나 디렉터리에 대해 읽기(read), 쓰기(write), 실행(execute) 가능 여부를 정하는 개념
+파일에 관해선 크게 두가지 관리 요소가 존재한다.
+1. 권한(어떤 작업을 할 수 있는지)
+   권한의 대상
+   소유자(user) : 파일의 주인
+   그룹(group) : 파일이 속한 그룹
+   기타 사용자(other) : 그 외 모든 사용자
 
+   권한의 종류
+   권한 종류는 다음과 같음.
+   r : 읽기 권한
+   w : 쓰기 권한
+   x : 실행 권한
+
+ls -l을 통해 이 파일이 누가 소유하고 있는지, 권한은 어떤지, 크기는 얼마인지까지 자세히 알 수 있다.
+-rw-r--r-- 1 gskim gskim  1200 Mar 19 10:00 file1.txt
+drwxr-xr-x 2 gskim gskim  4096 Mar 19 09:50 mydir
+
+#chmod
+chmod를 통해 파일이나 디렉터리의 권한(permission) 을 변경할 수 있다.
+chmod의 문자 방식: 어떤 대상에게 어떤 권한을 추가하거나 제거할지 직접 지정하는 방식
+u : user
+g : group
+o : other
+a : all
+chmod u+x script.sh -> 소유자에게 실행 권한 추가(+)
+chmod g-w file.txt -> 그룹의 쓰기 권한 제거(-)
+chmod o+r file.txt -> 기타 사용자에게 읽기 권한 추가(+)
+
+chmod의 숫자 방식: 권한을 숫자로 계산해서 지정하는 방법
+4 = read
+2 = write
+1 = execute
+
+7 = 4 + 2 + 1 = rwx
+6 = 4 + 2 = rw-
+5 = 4 + 1 = r-x
+4 = r--
+
+chmod 755 script.sh -> 소유자 rwx(7), 그룹 r-x(5), 기타 r-x(5)
+chmod 644 file.txt 
+
+2. 소유권(누가 그 파일의 주인인지, 어떤 그룹에 속하는지)
+소유권: 해당 파일을 누가 소유하고 있는지?
+소유권은 두가지로 구성된다.
+1. 소유자(owner) : 파일의 주 사용자
+2. 소유 그룹(group) : 파일이 속한 그룹
+ls -l을 통해 소유그룹과 소유자를 확인할 수 있다.
+-rw-r--r-- 1 gskim gskim  1200 Mar 19 10:00 file1.txt -> 소유자: gskim, 소유 그룹: gskim
+
+#chown
+chown을 통해 파일의 소유자를 변경할 수 있다.
+sudo chown user1 test.txt: test.txt의 소유자를 user1으로 변경
+sudo chown user1:devteam test.txt -> test.txt의 소유자와 소유그룹 둘 다 변경
+sudo chown -R user1:devteam mydir: mydir 디렉터리와 하위 파일의 소유자와 소유그룹 변경
+
+#chgrp
+chgrp을 통해 파일의 소유 그룹만 변경할 수 있다.
+sudo chgrp devteam test.txt -> test.txt의 파일 소유 그룹을 devteam으로 변경
+sudo chgrp -R devteam mydir -> mydir 디렉토리의 파일 소유 그룹을 devteam으로 변경
 
 
 
