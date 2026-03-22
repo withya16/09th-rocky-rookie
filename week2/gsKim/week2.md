@@ -1,0 +1,188 @@
+# 1. RPM vs DNF
+## RPM
+패키지 파일 자체를 설치, 삭제, 조회하는 도구. 
+개별 .rpm 파일을 직접 설치할 수 있음.
+패키지 버전, 파일 목록, 설치 여부 확인 가능.
+의존성 문제애 대해선 자동으로 잘 해결하지 못한다는 단점이 있음. -> 의존성: 어떤 프로그램이 실행되기 위해 함께 필요한 다른 패키지나 라이브러리
+
+
+## DNF
+RPM 패키지를 더 편하게 관리하기 위한 고수준의 패키지 관리자임.
+RHEL, Rocky Linux 같은 배포판에서 기본적으로 많이 사용됨.
+Repository에서 패키지를 검색하고 설치할 수 있음.
+의존성 패키지를 자동으로 함께 설치함.
+즉, DNF는 내부적으로 RPM을 사용하지만, 사용자는 이를 통해 더 간단한 명령으로 패키지를 관리할 수 있게 해줌.
+
+
+## 한줄 정리
+### RPM: 개별 부품을 직접 조립하는 공구
+### DNF: 필요한 부품까지 자동으로 챙겨서 설치해주는 관리자
+
+
+##2. DNF로 httpd 패키지 설치
+1. httpd 패키지 설치: dnf install httpd -y
+2. 설치 완료 여부 확인: dnf list installed httpd
+3. 설치 후 패키지 실행 및 이후 부팅에서도 자동으로 실행되도록 설정: systemctl enable -- now httpd
+4. 패키지 상태 확인: systemctl status httpd
+5. 업데이트 전, 현재 시스템에서 업데이트 가능한 패키지 확인: dnf check-update
+6. 패키지 업데이트: dnf update httpd -y(만약 시스템 전체 패키지를 업데이트 하고 싶으면? dnf update -y)
+7. 업데이트 후 버전 확인: rpm -qi httpd / dnf info httpd 
+
+##설치 중 오류 발생
+## 트러블슈팅
+
+1. `dnf install httpd` 실행 중 GPG 검증 오류가 발생하였음.
+2. 일부 의존 패키지에서 공개 키가 없거나, 저장소의 GPG 키와 맞지 않는다는 메시지가 출력되었음.
+3. 처음에는 GPG 키 문제로 판단하여 키 재등록 및 캐시 정리를 수행하였음. ->GPG(GNU Privacy Gaurd: 파일이나 패키지가 진짜인지 확인하고, 내용을 암호화할 때 쓰이는 도구)
+4. 그러나 동일한 오류가 계속 발생하여 다른 원인을 의심하였음.
+5. 이후 `sudo dnf update redhat-release` 명령어를 실행하여 release 관련 패키지를 갱신하였음. redhat-release 정보가 틀리면, dnf가 현재 os 버전을 잘못 인식하거나, 맞는 저장소를 못 찾거나, 패키지 의존성을 잘 판단하지 못 할 수 있다. 
+6. 그 결과 저장소 정보가 정상화되었고, 다시 `dnf install httpd`를 실행하자 설치가 완료되었음.
+7. 따라서 이번 문제는 GPG 키 자체보다는 `redhat-release` 패키지와 저장소 정보 불일치에서 비롯된 것으로 정리할 수 있음.
+
+## 3.Repository의 구조
+Repository는 리눅스의 패키지를 저장하고 배포하는 공간이다. 
+위에서 다뤘던 dnf, 그리고 yum를 통해 Repository에서 필요한 패키지를 설치하고 관리한다. -> RHEL 7.x에선 패키지 관리자 명령어로 yum을 많이 사용했지만 8.x부턴 dnf를 주로 사용한다. 
+보통 RHEL에서의 레포 설정파일은 /etc/yum.repos.d 경로의 설정파일을 통해 관리된다. 
+
+#BASE OS & APPSTREAM
+우리는 RHEL10 DVD ISO를 통해 VMware에 RHEL를 mount했다. 그럼 아래와 같은 기본적인 디렉토리 구조가 생성될 것.
+/mnt/rhel8/
+ ├── BaseOS/
+ ├── AppStream/
+
+BaseOS: 운영체제의 핵심 패키지가 들어 있는 곳. -> 예를 들면 시스템 부팅, 기본 명령어, 핵심 라이브러리, OS 동작에 필요한 기본 패키지들이 여기에 들어간다.
+AppStream: 추가 애플리케이션이나 사용자 공간 패키지를 담는 곳. -> 예를 들어 개발 도구, 언어 런타임, 데이터베이스 관련 패키지, 웹서버처럼 OS 핵심은 아니지만 많이 쓰는 소프트웨어들이 여기 포함된다.
+
+##BASE OS & APPSTREAM 관련 트러블 슈팅
+BASEOS 와 APPSTREAM mount 확인 결과, /mnt 디렉터리 안에 아무것도 존재하지 않았다. 그래서 DVD/CD 연결을 다시 설정하고 아래 명령어로 mount 실행
+DVD/CD가 잘 연결되어있는지 확인한 방법
+1. 현재 시스템에 연결된 모든 Block Device의 목록 출력: lsblk
+gskim@localhost:/$ lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+sr0            11:0    1  8.8G  0 rom  
+nvme0n1       259:0    0  100G  0 disk 
+├─nvme0n1p1   259:1    0  600M  0 part /boot/efi
+├─nvme0n1p2   259:2    0    1G  0 part /boot
+└─nvme0n1p3   259:3    0 98.4G  0 part 
+  ├─rhel-root 253:0    0 64.8G  0 lvm  /
+  ├─rhel-swap 253:1    0    2G  0 lvm  [SWAP]
+  └─rhel-home 253:2    0 31.6G  0 lvm  /home
+-> sr0이 존재하면 dvd/cd는 연결이 된 상태.
+
+2. 마운트 대상 폴더 생성: sudo mkdir -p /mnt/rhel
+3. 마운트 실행: sudo mount /dev/sr0 /mnt/rhel
+4. 마운트가 잘 됐는지 확인: ls /mnt/rhel
+gskim@localhost:/mnt/rhel$ ls
+AppStream  EFI   Flatpaks  RPM-GPG-KEY-redhat-beta     boot.catalog      images
+BaseOS     EULA  GPL       RPM-GPG-KEY-redhat-release  extra_files.json  media.repo
+
+
+#근데 APPSTREAM이 존재하지 않았는데 위에서 httpd는 어떻게 다운받았을까?
+1. ISO도 없고, 인터넷 저장소도 없음
+ -> 이 경우는 httpd 설치 불가. 왜냐하면 httpd RPM 파일과 의존성 패키지를 가져올 곳이 없기 때문이다.
+
+2. ISO는 없지만, Red Hat CDN 같은 원격 저장소가 정상 연결됨
+이 경우는 설치 가능하다. -> DVD 없어도 인터넷 통해 설치할 수 있어요.(subscription-manager로 Redhat 저장소가 붙어있어서 가능한건가?)
+
+gskim@localhost$ dnf repolist
+저장소 ID                                        저장소 이름
+rhel-10-for-aarch64-appstream-rpms               Red Hat Enterprise Linux 10 for ARM 64 - AppStream (RPMs)
+rhel-10-for-aarch64-baseos-rpms                  Red Hat Enterprise Linux 10 for ARM 64 - BaseOS (RPMs)
+아마 위의 Redhat Subscription 기반 원격 저장소를 통해 httpd가 다운 받아진 것 같다. 
+
+## 사용자 & 그룹
+사용자와 그룹은 시스템 보안과 권한 관리의 핵심이 된다. 
+리눅스는 다중 사용자 시스템이기 때문에 "누가(User)", "어떤 무리에 속해서(Group)", "무엇을 할 수 있는지"를 명확히 구분한다.
+#사용자
+Root 사용자: UID(사용자 식별 번호)가 0이며, 모든 파일과 명령에 접근할 수 있다.
+시스템 사용자: 서비스(Apache, MySQL 등)를 실행하기 위한 계정이다. 보통 로그인 쉘이 없으며(/sbin/nologin), UID는 보통 1~999.
+일반 사용자: 실제 사람이 사용하는 계정. UID는 1000번부터 시작.
+#사용자 관련 명령어
+1. useradd gsKim[이름]: 새로운 사용자 생성
+2. usermod -aG [그룹] [이름]: 사용자를 보조 그룹에 추가 (중요: -a를 빼면 기존 그룹에서 탈퇴되니 주의!)
+3. userdel -r [이름]: 사용자 삭제 (홈 디렉토리까지 삭제)
+4. passwd [이름]: 비밀번호 설정 또는 변경
+
+#그룹
+그룹은 사용자들을 하나로 묶어 권한을 한 번에 관리해준다.
+기본 그룹 (Primary Group): 사용자가 생성될 때 자동으로 할당되는 그룹 (RHEL은 사용자 이름과 동일한 그룹을 생성합니다.)
+보조 그룹 (Secondary/Supplementary Group): 사용자가 추가로 속할 수 있는 그룹 (예를 들어, wheel 그룹에 속하면 sudo 명령을 통해 관리자 권한을 쓸 수 있다.)
+
+#그룹 & 사용자 관리를 위해 알아야 할 핵심 디렉터리
+/etc/passwd(용도: 사용자 계정 정보):	사용자명, UID, GID, 홈 디렉토리, 쉘 경로
+/etc/shadow(용도: 암호화된 비밀번호):	비밀번호 해시, 만료일 등 보안 정보
+/etc/group(용도: 그룹 정보):	그룹명, GID, 그룹에 속한 사용자 목록
+
+##파일 권한 & 소유권 권한
+리눅스에서 파일 권한과 소유권 관리는 누가 파일을 읽고, 쓰고, 실행할 수 있는지를 정하는 작업이다. 서버를 운영할 때 보안과 접근 제어의 기본이 되는 개념이 된다. 
+
+#파일 권한
+파일 권한: 파일이나 디렉터리에 대해 읽기(read), 쓰기(write), 실행(execute) 가능 여부를 정하는 개념
+파일에 관해선 크게 두가지 관리 요소가 존재한다.
+1. 권한(어떤 작업을 할 수 있는지)
+   권한의 대상
+   소유자(user) : 파일의 주인
+   그룹(group) : 파일이 속한 그룹
+   기타 사용자(other) : 그 외 모든 사용자
+
+   권한의 종류
+   권한 종류는 다음과 같음.
+   r : 읽기 권한
+   w : 쓰기 권한
+   x : 실행 권한
+
+ls -l을 통해 이 파일이 누가 소유하고 있는지, 권한은 어떤지, 크기는 얼마인지까지 자세히 알 수 있다.
+-rw-r--r-- 1 gskim gskim  1200 Mar 19 10:00 file1.txt
+drwxr-xr-x 2 gskim gskim  4096 Mar 19 09:50 mydir
+
+#chmod
+chmod를 통해 파일이나 디렉터리의 권한(permission) 을 변경할 수 있다.
+chmod의 문자 방식: 어떤 대상에게 어떤 권한을 추가하거나 제거할지 직접 지정하는 방식
+u : user
+g : group
+o : other
+a : all
+chmod u+x script.sh -> 소유자에게 실행 권한 추가(+)
+chmod g-w file.txt -> 그룹의 쓰기 권한 제거(-)
+chmod o+r file.txt -> 기타 사용자에게 읽기 권한 추가(+)
+
+chmod의 숫자 방식: 권한을 숫자로 계산해서 지정하는 방법
+4 = read
+2 = write
+1 = execute
+
+7 = 4 + 2 + 1 = rwx
+6 = 4 + 2 = rw-
+5 = 4 + 1 = r-x
+4 = r--
+
+chmod 755 script.sh -> 소유자 rwx(7), 그룹 r-x(5), 기타 r-x(5)
+chmod 644 file.txt 
+
+2. 소유권(누가 그 파일의 주인인지, 어떤 그룹에 속하는지)
+소유권: 해당 파일을 누가 소유하고 있는지?
+소유권은 두가지로 구성된다.
+1. 소유자(owner) : 파일의 주 사용자
+2. 소유 그룹(group) : 파일이 속한 그룹
+ls -l을 통해 소유그룹과 소유자를 확인할 수 있다.
+-rw-r--r-- 1 gskim gskim  1200 Mar 19 10:00 file1.txt -> 소유자: gskim, 소유 그룹: gskim
+
+
+#umask
+
+#chown
+chown을 통해 파일의 소유자를 변경할 수 있다.
+sudo chown user1 test.txt: test.txt의 소유자를 user1으로 변경
+sudo chown user1:devteam test.txt -> test.txt의 소유자와 소유그룹 둘 다 변경
+sudo chown -R user1:devteam mydir: mydir 디렉터리와 하위 파일의 소유자와 소유그룹 변경
+
+#chgrp
+chgrp을 통해 파일의 소유 그룹만 변경할 수 있다.
+sudo chgrp devteam test.txt -> test.txt의 파일 소유 그룹을 devteam으로 변경
+sudo chgrp -R devteam mydir -> mydir 디렉토리의 파일 소유 그룹을 devteam으로 변경
+
+
+
+
+
+
